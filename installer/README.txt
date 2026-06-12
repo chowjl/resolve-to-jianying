@@ -1,10 +1,10 @@
-达芬奇时间线转剪映草稿 / Resolve Timeline to Jianying Draft
+达芬奇与剪映时间线互转 / DaVinci Resolve and Jianying Timeline Bridge
 ============================================================
 
 简介 / Overview
 ---------------
-将 DaVinci Resolve 当前时间线转换成 Windows 剪映专业版可继续编辑的草稿。
-Convert the current DaVinci Resolve timeline into an editable Windows Jianying Pro draft.
+在 DaVinci Resolve 与 Windows 剪映专业版之间双向迁移可编辑时间线。
+Transfer editable timelines between DaVinci Resolve and Jianying Pro for Windows.
 
 系统要求 / Requirements
 -----------------------
@@ -25,6 +25,7 @@ Convert the current DaVinci Resolve timeline into an editable Windows Jianying P
 
 使用 / Usage
 ------------
+达芬奇转剪映 / Resolve to Jianying:
 1. 在 DaVinci Resolve 中打开目标项目和时间线。
    Open the target project and timeline in DaVinci Resolve.
 2. 选择：Workspace > Scripts > Utility > Current Timeline to Jianying
@@ -34,6 +35,15 @@ Convert the current DaVinci Resolve timeline into an editable Windows Jianying P
    Wait for the progress window; Resolve remains usable.
 5. 转换完成后剪映会自动启动。
    Jianying starts automatically when conversion finishes.
+
+剪映转达芬奇 / Jianying to Resolve:
+1. 在 DaVinci Resolve 中打开接收项目。
+   Open the destination project in DaVinci Resolve.
+2. 选择：Workspace > Scripts > Utility > Jianying Timeline to Resolve
+3. 文件夹选择器会自动定位到剪映草稿目录；选择目标草稿文件夹。
+   The folder picker opens at Jianying's draft root; select the target draft folder.
+4. 确认时间线名称并点击“导入时间线”。
+   Confirm the timeline name and click Import Timeline.
 
 支持内容 / Supported Content
 ----------------------------

@@ -3,10 +3,15 @@ $ErrorActionPreference = "Stop"
 try {
     $ResolveSupport = Join-Path $env:APPDATA "Blackmagic Design\DaVinci Resolve\Support"
     $ToolRoot = Join-Path $ResolveSupport "XiaoerTools"
-    $MenuScript = Join-Path $ResolveSupport "Fusion\Scripts\Utility\Current Timeline to Jianying.py"
+    $MenuScripts = @(
+        (Join-Path $ResolveSupport "Fusion\Scripts\Utility\Current Timeline to Jianying.py"),
+        (Join-Path $ResolveSupport "Fusion\Scripts\Utility\Jianying Timeline to Resolve.py")
+    )
 
-    if (Test-Path -LiteralPath $MenuScript) {
-        Remove-Item -LiteralPath $MenuScript -Force
+    foreach ($MenuScript in $MenuScripts) {
+        if (Test-Path -LiteralPath $MenuScript) {
+            Remove-Item -LiteralPath $MenuScript -Force
+        }
     }
     if (Test-Path -LiteralPath $ToolRoot) {
         Remove-Item -LiteralPath $ToolRoot -Recurse -Force

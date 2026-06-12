@@ -25,6 +25,13 @@ Convert the current DaVinci Resolve timeline into an editable Windows Jianying P
 - 支持转换前重命名、运行进度和完成确认  
   Provide draft naming, progress UI, and completion confirmation.
 
+## 界面预览 / Interface Preview
+
+在 DaVinci Resolve 中运行脚本后，可以确认或修改剪映草稿名称，再开始转换。  
+After launching the script in DaVinci Resolve, confirm or rename the Jianying draft before starting the conversion.
+
+![DaVinci Resolve 转剪映草稿界面 / Resolve to Jianying conversion dialog](docs/images/resolve-to-jianying-dialog.png)
+
 ## 环境要求 / Requirements
 
 - Windows 10/11

@@ -1,45 +1,65 @@
-DaVinci Resolve 当前时间线 → 剪映草稿
-========================================
+达芬奇时间线转剪映草稿 / Resolve Timeline to Jianying Draft
+============================================================
 
-系统要求
---------
+简介 / Overview
+---------------
+将 DaVinci Resolve 当前时间线转换成 Windows 剪映专业版可继续编辑的草稿。
+Convert the current DaVinci Resolve timeline into an editable Windows Jianying Pro draft.
+
+系统要求 / Requirements
+-----------------------
 1. Windows 10/11
-2. DaVinci Resolve 21（免费版或 Studio）
-3. Windows 剪映专业版
-4. Python 3.8 以上，推荐 Python 3.11/3.12
-   安装 Python 时请勾选“Add Python to PATH”。
-5. 首次安装 Python 依赖时需要联网。
+2. DaVinci Resolve 20 或 21 / DaVinci Resolve 20 or 21
+3. Windows 剪映专业版 / Jianying Pro for Windows
+4. Python 3.8+，推荐 3.11/3.12 / Python 3.8+, preferably 3.11/3.12
+5. 首次安装依赖时需要联网 / Internet access is required during first installation
 
-安装
-----
-1. 解压整个 ZIP，不要只单独打开其中一个文件。
+安装 / Installation
+-------------------
+1. 解压整个 ZIP，不要只运行压缩包内的单个文件。
+   Extract the entire ZIP before running the installer.
 2. 双击“安装.cmd”或“Install.cmd”。
-3. 安装成功后，完全退出并重新启动 DaVinci Resolve。
+   Double-click Install.cmd or 安装.cmd.
+3. 安装完成后，完全退出并重新启动 DaVinci Resolve。
+   Fully restart DaVinci Resolve after installation.
 
-使用
-----
-1. 在 DaVinci Resolve 中打开目标时间线。
+使用 / Usage
+------------
+1. 在 DaVinci Resolve 中打开目标项目和时间线。
+   Open the target project and timeline in DaVinci Resolve.
 2. 选择：Workspace > Scripts > Utility > Current Timeline to Jianying
-3. 修改剪映草稿名称，点击“开始转换”。
-4. 等待进度窗口完成；剪映会自动启动。
+3. 输入剪映草稿名称并点击“开始转换”。
+   Enter the Jianying draft name and click Start Conversion.
+4. 等待进度窗口完成；转换期间可以继续使用 Resolve。
+   Wait for the progress window; Resolve remains usable.
+5. 转换完成后剪映会自动启动。
+   Jianying starts automatically when conversion finishes.
 
-转换范围
---------
-- 保留视频和音频轨道、片段位置、源入点/出点。
-- 保留基础缩放、位置、旋转和透明度。
-- 会创建一条空的剪映主轨，避免达芬奇 V1 被剪映主轨磁吸而错位。
-- 直接读取达芬奇当前时间线分辨率，支持 9:16 等竖屏时间线。
-- 识别视频的 90°/270° 旋转元数据，使剪映选框贴合实际画面。
-- 源素材会同步出现在剪映左侧素材库中，并按文件去重。
-- 视频内嵌音频保持在视频片段中，可在剪映里按需“分离音频”。
-- Resolve 调色节点、Fusion、第三方插件和复杂特效不会完整迁移。
+支持内容 / Supported Content
+----------------------------
+- 视频和音频轨道 / Video and audio tracks
+- 时间位置、剪辑点、素材入点与出点 / Timeline edits and source ranges
+- 基础缩放、位置、旋转与透明度 / Basic transforms and opacity
+- 横屏、竖屏时间线 / Landscape and portrait timelines
+- 素材库同步与去重 / Media library population and deduplication
+- 空剪映主轨防止第一轨磁吸错位 / Empty main track to prevent magnetic offsets
 
-卸载
-----
-双击“卸载.cmd”。卸载不会删除已经生成的剪映草稿。
+限制 / Limitations
+------------------
+Resolve 调色节点、Fusion、第三方插件、复杂转场、光流变速及 Fairlight 特效
+无法保证完整迁移。
 
-开源依赖
---------
-本工具内含 pyJianYingDraft 0.2.6：
+Resolve color nodes, Fusion compositions, third-party plugins, complex transitions,
+optical-flow retiming, and Fairlight effects are not guaranteed to transfer.
+
+卸载 / Uninstallation
+---------------------
+双击“卸载.cmd”或“Uninstall.cmd”。卸载不会删除已生成的剪映草稿。
+Double-click Uninstall.cmd or 卸载.cmd. Existing Jianying drafts are preserved.
+
+开源依赖 / Open-source Dependency
+---------------------------------
+pyJianYingDraft 0.2.6
 https://github.com/GuanYixuan/pyJianYingDraft
-其许可证副本位于 THIRD_PARTY_LICENSES 文件夹。
+许可证位于 THIRD_PARTY_LICENSES 文件夹。
+Its license is included in THIRD_PARTY_LICENSES.

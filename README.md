@@ -1,8 +1,8 @@
-# 达芬奇时间线转剪映草稿 / Resolve Timeline to Jianying Draft
+# 达芬奇与剪映时间线互转 / DaVinci Resolve and Jianying Timeline Bridge
 
-将 DaVinci Resolve 当前时间线一键转换为 Windows 剪映专业版可继续编辑的草稿。
+在 DaVinci Resolve 与 Windows 剪映专业版之间双向迁移可编辑时间线。
 
-Convert the current DaVinci Resolve timeline into an editable Windows Jianying Pro draft with one command.
+Transfer editable timelines in both directions between DaVinci Resolve and Jianying Pro for Windows.
 
 ## 功能 / Features
 
@@ -24,6 +24,10 @@ Convert the current DaVinci Resolve timeline into an editable Windows Jianying P
   Keep an empty Jianying main track to prevent magnetic-track offsets.
 - 支持转换前重命名、运行进度和完成确认  
   Provide draft naming, progress UI, and completion confirmation.
+- 从 Resolve 菜单直接导入剪映草稿，支持剪映 10.8 加密草稿<br>
+  Import Jianying drafts directly from Resolve, including encrypted Jianying 10.8 drafts.
+- 打开反向脚本时自动定位到剪映草稿根目录<br>
+  Open the folder picker directly at Jianying's draft root.
 
 ## 界面预览 / Interface Preview
 
@@ -52,6 +56,8 @@ After launching the script in DaVinci Resolve, confirm or rename the Jianying dr
 
 ## 使用说明 / Usage
 
+### DaVinci Resolve → 剪映 / Resolve → Jianying
+
 1. 在 DaVinci Resolve 中打开需要转换的项目和时间线。  
    Open the target project and timeline in DaVinci Resolve.
 2. 选择以下菜单：  
@@ -67,6 +73,24 @@ After launching the script in DaVinci Resolve, confirm or rename the Jianying dr
    Wait for the progress window; Resolve remains usable during conversion.
 5. 转换完成后剪映会自动启动，在草稿列表中打开新项目。  
    Jianying starts automatically; open the new project from its draft list.
+
+### 剪映 → DaVinci Resolve / Jianying → Resolve
+
+1. 在 DaVinci Resolve 中打开用于接收时间线的项目。<br>
+   Open the destination project in DaVinci Resolve.
+2. 选择以下菜单：<br>
+   Open this menu:
+
+   ```text
+   Workspace > Scripts > Utility > Jianying Timeline to Resolve
+   ```
+
+3. 文件夹选择器会自动打开剪映草稿根目录，选择需要导入的草稿文件夹。<br>
+   The folder picker opens at Jianying's draft root automatically; select the draft folder to import.
+4. 确认或修改时间线名称，点击“导入时间线”。<br>
+   Confirm or rename the timeline, then click Import Timeline.
+5. 脚本会解密本机草稿副本并导入 Resolve，不会修改原始剪映草稿。<br>
+   The script decrypts a temporary local copy and imports it into Resolve without modifying the original draft.
 
 ## 转换范围 / Conversion Scope
 
@@ -99,6 +123,9 @@ Run `卸载.cmd` or `Uninstall.cmd`. Existing Jianying drafts will not be delete
 
 本项目使用 [pyJianYingDraft](https://github.com/GuanYixuan/pyJianYingDraft)，许可证见 `THIRD_PARTY_LICENSES/`。  
 This project uses [pyJianYingDraft](https://github.com/GuanYixuan/pyJianYingDraft). Its license is included under `THIRD_PARTY_LICENSES/`.
+
+加密草稿读取使用 MIT 许可的 [jy-draftc](https://github.com/wenshui330/jy-draftc)，仅调用本机剪映安装目录中的 `videoeditor.dll`。<br>
+Encrypted draft reading uses the MIT-licensed [jy-draftc](https://github.com/wenshui330/jy-draftc) helper and calls only the local Jianying installation's `videoeditor.dll`.
 
 ## License
 

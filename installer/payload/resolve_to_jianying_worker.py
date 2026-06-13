@@ -22,6 +22,7 @@ def main():
     parser.add_argument("--log", required=True)
     parser.add_argument("--width", type=int)
     parser.add_argument("--height", type=int)
+    parser.add_argument("--subtitles")
     args = parser.parse_args()
 
     started = time.perf_counter()
@@ -62,6 +63,8 @@ def main():
         ]
         if args.width and args.height:
             command.extend(["--width", str(args.width), "--height", str(args.height)])
+        if args.subtitles:
+            command.extend(["--subtitles", args.subtitles])
         state["process"] = subprocess.Popen(
             command,
             stdout=subprocess.PIPE,
@@ -82,6 +85,8 @@ def main():
         progress.stop()
         try:
             Path(args.xml).unlink(missing_ok=True)
+            if args.subtitles:
+                Path(args.subtitles).unlink(missing_ok=True)
         except OSError:
             pass
         if process.returncode != 0:
@@ -107,10 +112,33 @@ def main():
         if os.path.isfile(args.jianying):
             subprocess.Popen([args.jianying], creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
         root.withdraw()
+        skipped_adjustments = report.get("skipped_adjustment_clips", 0)
+        warning_note = ""
+        if skipped_adjustments:
+            warning_note = "\n\n提示：已跳过 %s 个达芬奇调整图层，其他内容已正常导入。" % skipped_adjustments
+        disabled_video = report.get("disabled_video_clips", 0)
+        disabled_audio = report.get("disabled_audio_clips", 0)
+        if disabled_video or disabled_audio:
+            warning_note += "\n已保留禁用片段：视频 %s 个、音频 %s 个（保持静音/不可见）。" % (
+                disabled_video, disabled_audio
+            )
+        retimed_clips = report.get("retimed_clips", 0)
+        if retimed_clips:
+            warning_note += "\n已转换 %s 个固定变速视频/音频片段。" % retimed_clips
+        other_warnings = len(report.get("warnings") or [])
+        if other_warnings:
+            warning_note += "\n另有 %s 个不支持的片段已跳过，详情已写入日志。" % other_warnings
         messagebox.showinfo(
             "达芬奇 → 剪映",
-            "转换完成！\n\n草稿：%s\n视频片段：%s\n音频片段：%s\n耗时：%.1f 秒\n\n已启动剪映，请在草稿列表中打开该项目。"
-            % (args.name, report.get("video_clips", 0), report.get("audio_clips", 0), elapsed),
+            "转换完成！\n\n草稿：%s\n视频片段：%s\n音频片段：%s\n字幕：%s\n耗时：%.1f 秒%s\n\n已启动剪映，请在草稿列表中打开该项目。"
+            % (
+                args.name,
+                report.get("video_clips", 0),
+                report.get("audio_clips", 0),
+                report.get("subtitle_clips", 0),
+                elapsed,
+                warning_note,
+            ),
             parent=root,
         )
         root.destroy()

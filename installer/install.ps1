@@ -54,8 +54,19 @@ function Find-Jianying {
     return $null
 }
 
+function Find-JianyingInstallDir([string]$JianyingExe) {
+    $direct = Split-Path -Parent $JianyingExe
+    if (Test-Path -LiteralPath (Join-Path $direct "videoeditor.dll")) { return $direct }
+    $base = Join-Path $env:LOCALAPPDATA "JianyingPro\Apps"
+    $found = Get-ChildItem $base -Recurse -Filter "videoeditor.dll" -File -ErrorAction SilentlyContinue |
+        Sort-Object { $_.Directory.Name } -Descending |
+        Select-Object -First 1
+    if ($found) { return $found.Directory.FullName }
+    return $null
+}
+
 try {
-    Write-Host "DaVinci Resolve Timeline to Jianying Draft" -ForegroundColor White
+    Write-Host "DaVinci Resolve and Jianying Timeline Bridge" -ForegroundColor White
     Write-Host "One-click installer" -ForegroundColor White
 
     if (-not (Test-Path -LiteralPath $PayloadRoot)) {
@@ -75,6 +86,11 @@ try {
         throw "Jianying Pro was not found. Install and launch Jianying at least once."
     }
     Write-Host "Jianying: $JianyingExe"
+    $JianyingInstallDir = Find-JianyingInstallDir $JianyingExe
+    if (-not $JianyingInstallDir) {
+        throw "Jianying videoeditor.dll was not found. Reinstall or update Jianying Pro."
+    }
+    Write-Host "Jianying engine: $JianyingInstallDir"
 
     $ResolveExe = "C:\Program Files\Blackmagic Design\DaVinci Resolve\Resolve.exe"
     if (-not (Test-Path -LiteralPath $ResolveExe)) {
@@ -103,27 +119,41 @@ try {
     New-Item -ItemType Directory -Force -Path $ToolRoot, $MenuRoot, $DraftRoot | Out-Null
     Copy-Item -LiteralPath (Join-Path $PayloadRoot "xml_to_jianying_draft.py") -Destination $ToolRoot -Force
     Copy-Item -LiteralPath (Join-Path $PayloadRoot "resolve_to_jianying_worker.py") -Destination $ToolRoot -Force
+    Copy-Item -LiteralPath (Join-Path $PayloadRoot "jianying_to_resolve_xml.py") -Destination $ToolRoot -Force
     Copy-Item -LiteralPath (Join-Path $PayloadRoot "Current Timeline to Jianying.py") -Destination $MenuRoot -Force
+    Copy-Item -LiteralPath (Join-Path $PayloadRoot "Jianying Timeline to Resolve.py") -Destination $MenuRoot -Force
     Copy-Item -LiteralPath (Join-Path $PayloadRoot "vendor") -Destination $ToolRoot -Recurse -Force
+    Copy-Item -LiteralPath (Join-Path $PayloadRoot "jy-draftc") -Destination $ToolRoot -Recurse -Force
 
     $Config = [ordered]@{
         python_exe = $PythonExe
         jianying_exe = $JianyingExe
+        jianying_install_dir = $JianyingInstallDir
         draft_root = $DraftRoot
         installed_at = (Get-Date).ToString("s")
-        version = "1.0.1"
+        version = "1.2.0"
     }
     $ConfigJson = $Config | ConvertTo-Json
     $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
     [System.IO.File]::WriteAllText((Join-Path $ToolRoot "config.json"), $ConfigJson, $Utf8NoBom)
+    [System.IO.File]::WriteAllText(
+        (Join-Path $ToolRoot "jy-draftc\.env"),
+        "JY_INSTALL_DIR=$JianyingInstallDir`n",
+        $Utf8NoBom
+    )
 
     Write-Step "Validating installation"
-    & $PythonExe -m py_compile (Join-Path $ToolRoot "xml_to_jianying_draft.py") (Join-Path $ToolRoot "resolve_to_jianying_worker.py")
+    & $PythonExe -m py_compile `
+        (Join-Path $ToolRoot "xml_to_jianying_draft.py") `
+        (Join-Path $ToolRoot "resolve_to_jianying_worker.py") `
+        (Join-Path $ToolRoot "jianying_to_resolve_xml.py") `
+        (Join-Path $MenuRoot "Jianying Timeline to Resolve.py")
     if ($LASTEXITCODE -ne 0) { throw "Helper script validation failed." }
 
     Write-Host "`nInstallation completed." -ForegroundColor Green
     Write-Host "Restart DaVinci Resolve, then run:"
     Write-Host "Workspace > Scripts > Utility > Current Timeline to Jianying" -ForegroundColor Yellow
+    Write-Host "Workspace > Scripts > Utility > Jianying Timeline to Resolve" -ForegroundColor Yellow
 } catch {
     Write-Host "`nInstallation failed: $($_.Exception.Message)" -ForegroundColor Red
     exit 1

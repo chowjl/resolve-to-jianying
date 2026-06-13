@@ -1,34 +1,45 @@
-# 达芬奇时间线转剪映草稿 / Resolve Timeline to Jianying Draft
+# 达芬奇与剪映时间线互转 / DaVinci Resolve and Jianying Timeline Bridge
 
-将 DaVinci Resolve 当前时间线一键转换为 Windows 剪映专业版可继续编辑的草稿。
-
-Convert the current DaVinci Resolve timeline into an editable Windows Jianying Pro draft with one command.
+在 DaVinci Resolve 与 Windows 剪映专业版之间迁移可编辑时间线。
+Transfer editable timelines between DaVinci Resolve and Jianying Pro for Windows.
 
 ## 功能 / Features
 
-- 从 Resolve 的 `Workspace > Scripts > Utility` 菜单直接运行  
-  Run directly from Resolve's `Workspace > Scripts > Utility` menu.
-- 自动读取当前时间线，无需手动导出 XML  
-  Read the current timeline automatically without manually exporting XML.
-- 保留视频/音频轨道、剪辑点、源入点和出点  
-  Preserve video/audio tracks, edits, source in points, and source out points.
-- 支持基础缩放、位置、旋转和透明度  
-  Transfer basic scale, position, rotation, and opacity settings.
-- 自动读取横屏、竖屏时间线分辨率  
-  Detect landscape and portrait timeline resolutions.
-- 识别素材 90°/270° 旋转信息，使剪映选框贴合画面  
-  Handle 90°/270° rotation metadata so selection bounds match the visible image.
-- 将源文件同步到剪映素材库，并按文件去重  
-  Populate Jianying's media library and deduplicate source files.
-- 使用空剪映主轨，避免 Resolve V1 被磁吸后错位  
-  Keep an empty Jianying main track to prevent magnetic-track offsets.
-- 支持转换前重命名、运行进度和完成确认  
-  Provide draft naming, progress UI, and completion confirmation.
+### DaVinci Resolve → 剪映 / Resolve → Jianying
+
+- 从 Resolve 的 `Workspace > Scripts > Utility` 直接导出当前时间线。
+- 保留视频、独立音频轨道、剪辑位置、源入点/出点和画布比例。
+- 使用 Resolve 的真实链接关系处理视频原声：已有独立 A 轨时避免重复声音，没有独立音频时保留视频原声。
+- 支持 MP4 内分离音频，以及 WAV、MP3 等纯音频素材。
+- 支持整段固定变速，并使用 Resolve API 的真实源时间保持画面入点。
+- 将 Resolve 字幕轨转换为剪映字幕轨。
+- 将 Resolve 禁用的灰色视频/音频片段转换为剪映真正的停用片段，可在剪映中重新启用。
+- 自动跳过无法等价转换的 Resolve Adjustment Clip，并在完成窗口显示数量。
+- 保留空的剪映主轨，防止 Resolve V1 被磁吸到时间线起点。
+
+- Export the current Resolve timeline directly from `Workspace > Scripts > Utility`.
+- Preserve video and independent audio tracks, edit positions, source ranges, and canvas dimensions.
+- Use Resolve's real clip links to avoid duplicate embedded audio while retaining audio on videos without a linked A-track clip.
+- Support audio detached from MP4 files plus standalone WAV and MP3 assets.
+- Transfer constant-speed retiming using Resolve's real source times, preserving the visible source range.
+- Convert Resolve subtitle tracks into Jianying subtitle tracks.
+- Map disabled Resolve clips to Jianying's real disabled state so they can be re-enabled later.
+- Skip unsupported Resolve Adjustment Clips and report the skipped count.
+- Keep Jianying's magnetic main track empty to avoid V1 ripple offsets.
+
+### 剪映 → DaVinci Resolve / Jianying → Resolve
+
+- 直接读取剪映草稿，包括剪映 10.8 加密草稿。
+- 自动定位剪映草稿目录，并允许修改导入后的时间线名称。
+- 创建视频和音频轨道，保留片段位置、源范围、帧率和画布尺寸。
+- 剪映字幕会生成 SRT；请在 Resolve 中选择 `File > Import > Subtitle` 导入。
+
+- Read Jianying drafts directly, including encrypted Jianying 10.8 drafts.
+- Open the folder picker at Jianying's draft root and allow timeline renaming.
+- Create video/audio tracks while preserving positions, source ranges, frame rate, and canvas size.
+- Jianying subtitles are exported as SRT; import them in Resolve with `File > Import > Subtitle`.
 
 ## 界面预览 / Interface Preview
-
-在 DaVinci Resolve 中运行脚本后，可以确认或修改剪映草稿名称，再开始转换。  
-After launching the script in DaVinci Resolve, confirm or rename the Jianying draft before starting the conversion.
 
 ![DaVinci Resolve 转剪映草稿界面 / Resolve to Jianying conversion dialog](docs/images/resolve-to-jianying-dialog.png)
 
@@ -43,62 +54,68 @@ After launching the script in DaVinci Resolve, confirm or rename the Jianying dr
 
 1. 从 [Releases](../../releases) 下载最新 ZIP。  
    Download the latest ZIP from [Releases](../../releases).
-2. 解压整个 ZIP，不要只运行压缩包内的单个文件。  
-   Extract the entire ZIP before running the installer.
+2. 解压完整 ZIP。
+   Extract the entire ZIP.
 3. 双击 `安装.cmd` 或 `Install.cmd`。  
    Double-click `安装.cmd` or `Install.cmd`.
 4. 完全退出并重新启动 DaVinci Resolve。  
    Fully restart DaVinci Resolve.
 
-## 使用说明 / Usage
+## 使用 / Usage
 
-1. 在 DaVinci Resolve 中打开需要转换的项目和时间线。  
-   Open the target project and timeline in DaVinci Resolve.
-2. 选择以下菜单：  
-   Open this menu:
+### Resolve → 剪映 / Jianying
+
+1. 在 Resolve 中打开目标时间线。
+2. 运行：
 
    ```text
    Workspace > Scripts > Utility > Current Timeline to Jianying
    ```
 
-3. 输入生成后的剪映草稿名称，点击“开始转换”。  
-   Enter the Jianying draft name and click Start Conversion.
-4. 等待进度窗口完成。转换期间可以继续使用 Resolve。  
-   Wait for the progress window; Resolve remains usable during conversion.
-5. 转换完成后剪映会自动启动，在草稿列表中打开新项目。  
-   Jianying starts automatically; open the new project from its draft list.
+3. 输入剪映草稿名称并开始转换。
+4. 转换完成后，在剪映草稿列表中打开新项目。
 
-## 转换范围 / Conversion Scope
+### 剪映 → Resolve
 
-可以迁移 / Supported:
+1. 在 Resolve 中打开接收时间线的项目。
+2. 运行：
 
-- 视频和音频轨道 / Video and audio tracks
-- 时间线位置与剪辑点 / Timeline positions and edits
-- 素材入点和出点 / Source in and out points
-- 基础缩放、位置、旋转、透明度 / Basic scale, position, rotation, and opacity
-- 横屏与竖屏画布 / Landscape and portrait canvases
-- 素材库索引 / Media library entries
+   ```text
+   Workspace > Scripts > Utility > Jianying Timeline to Resolve
+   ```
 
-无法保证完整迁移 / Not fully transferable:
+3. 选择剪映草稿文件夹，确认时间线名称并导入。
+4. 如有字幕，按完成提示使用 `File > Import > Subtitle` 导入生成的 SRT。
 
-- Resolve 调色节点 / Resolve color nodes
-- Fusion 合成 / Fusion compositions
-- 第三方插件 / Third-party plugins
-- 复杂转场和光流变速 / Complex transitions and optical-flow retiming
-- Fairlight 音频特效 / Fairlight audio effects
+## 转换限制 / Limitations
 
-视频内嵌音频会保留在视频片段中，可在剪映内按需使用“分离音频”。  
-Embedded audio remains attached to video clips and can be detached inside Jianying when needed.
+以下内容不能保证等价转换：
+
+- Resolve Adjustment Clip（自动跳过并提示）
+- 速度曲线、速度坡度、倒放和逐帧变速
+- Optical Flow、Speed Warp 和帧混合算法
+- Resolve 调色节点与 Fusion 合成
+- 第三方插件、复杂转场和 Fairlight 音频效果
+
+The following cannot be transferred exactly:
+
+- Resolve Adjustment Clips (skipped with a completion notice)
+- Speed curves, speed ramps, reverse playback, and frame-by-frame retiming
+- Optical Flow, Speed Warp, and frame-blending algorithms
+- Resolve color nodes and Fusion compositions
+- Third-party plugins, complex transitions, and Fairlight effects
 
 ## 卸载 / Uninstallation
 
 运行 `卸载.cmd` 或 `Uninstall.cmd`。卸载不会删除已生成的剪映草稿。  
-Run `卸载.cmd` or `Uninstall.cmd`. Existing Jianying drafts will not be deleted.
+Run `卸载.cmd` or `Uninstall.cmd`. Existing Jianying drafts are preserved.
 
-## 开源依赖 / Open-source Dependency
+## 开源依赖 / Open-source Dependencies
 
-本项目使用 [pyJianYingDraft](https://github.com/GuanYixuan/pyJianYingDraft)，许可证见 `THIRD_PARTY_LICENSES/`。  
-This project uses [pyJianYingDraft](https://github.com/GuanYixuan/pyJianYingDraft). Its license is included under `THIRD_PARTY_LICENSES/`.
+- [pyJianYingDraft](https://github.com/GuanYixuan/pyJianYingDraft)
+- [jy-draftc](https://github.com/wenshui330/jy-draftc), MIT licensed, used for local encrypted-draft reading
+
+Third-party licenses are included under `THIRD_PARTY_LICENSES/`.
 
 ## License
 

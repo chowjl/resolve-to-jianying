@@ -24,6 +24,7 @@ class BaseSegment:
         self.segment_id = uuid.uuid4().hex
         self.material_id = material_id
         self.target_timerange = target_timerange
+        self.visible = True
 
         self.common_keyframes = []
 
@@ -66,7 +67,7 @@ class BaseSegment:
             "reverse": False,
             "track_attribute": 0,
             "track_render_index": 0,
-            "visible": True,
+            "visible": self.visible,
             # 写入自定义字段
             "id": self.segment_id,
             "material_id": self.material_id,

@@ -21,7 +21,7 @@ for vendored in (HERE / "vendor", HERE / "pyJianYingDraft"):
 
 import pyJianYingDraft as draft  # noqa: E402
 from pyJianYingDraft import ClipSettings, Timerange  # noqa: E402
-from pyJianYingDraft import VideoMaterial  # noqa: E402
+from pyJianYingDraft import AudioMaterial, VideoMaterial  # noqa: E402
 from pymediainfo import MediaInfo  # noqa: E402
 
 
@@ -115,6 +115,17 @@ def clip_path(clip: ET.Element, files: dict[str, str]) -> str:
     raise ValueError(f"clip {clip.get('id')} references unknown file {file_id!r}")
 
 
+def is_adjustment_clip(clip: ET.Element) -> bool:
+    file_node = clip.find("file")
+    values = [
+        clip.get("id", ""),
+        node_text(clip.find("name")),
+        file_node.get("id", "") if file_node is not None else "",
+        node_text(file_node.find("name")) if file_node is not None else "",
+    ]
+    return any("adjustment clip" in value.lower() for value in values)
+
+
 def clip_timeranges(clip: ET.Element, default_fps: float) -> tuple[Timerange, Timerange]:
     fps = effective_fps(clip.find("rate")) if clip.find("rate") is not None else default_fps
     start = int(node_text(clip.find("start"), "0"))
@@ -130,13 +141,12 @@ def clip_timeranges(clip: ET.Element, default_fps: float) -> tuple[Timerange, Ti
     return target, source
 
 
-def clip_signature(clip: ET.Element, files: dict[str, str]) -> tuple[str, str, str, str, str]:
+def timeline_clip_key(clip: ET.Element, files: dict[str, str]) -> tuple[str, str, str]:
+    """Identify the same visible edit across Resolve's video and audio tracks."""
     return (
-        os.path.normcase(clip_path(clip, files)),
+        os.path.normcase(os.path.abspath(clip_path(clip, files))),
         node_text(clip.find("start")),
         node_text(clip.find("end")),
-        node_text(clip.find("in")),
-        node_text(clip.find("out")),
     )
 
 
@@ -160,6 +170,53 @@ def create_video_material(path: str) -> VideoMaterial:
     except Exception:
         pass
     return material
+
+
+def create_audio_material(path: str) -> AudioMaterial:
+    """Create an audio material, including audio streams embedded in video files."""
+    info = MediaInfo.parse(path, mediainfo_options={"File_TestContinuousFileNames": "0"})
+    if not info.audio_tracks:
+        raise ValueError(f"素材没有音频轨道：{path}")
+    audio_track = info.audio_tracks[0]
+    general_track = info.general_tracks[0] if info.general_tracks else None
+    duration_ms = getattr(audio_track, "duration", None)
+    if duration_ms is None and general_track is not None:
+        duration_ms = getattr(general_track, "duration", None)
+    if duration_ms is None:
+        raise ValueError(f"无法读取音频时长：{path}")
+
+    # AudioMaterial normally rejects containers that also have a video stream.
+    # Jianying accepts the same MP4 path as an audio material, so populate the
+    # small material object directly and preserve Resolve's separate audio edit.
+    material = AudioMaterial.__new__(AudioMaterial)
+    material.material_id = uuid.uuid4().hex
+    material.material_name = Path(path).name
+    material.path = os.path.abspath(path)
+    material.duration = int(round(float(duration_ms) * 1_000))
+    return material
+
+
+def manifest_key(track_type: str, track_index: int, clip: ET.Element) -> tuple[str, int, int, int]:
+    return (
+        track_type,
+        track_index,
+        int(node_text(clip.find("start"), "0")),
+        int(node_text(clip.find("end"), "0")),
+    )
+
+
+def manifest_source_timerange(item: dict | None, fallback: Timerange) -> Timerange:
+    if not item:
+        return fallback
+    start_value = item.get("source_start_time")
+    end_value = item.get("source_end_time")
+    if start_value is None or end_value is None:
+        return fallback
+    start = round(float(start_value) * 1_000_000)
+    end = round(float(end_value) * 1_000_000)
+    if end <= start:
+        return fallback
+    return Timerange(start, end - start)
 
 
 def update_draft_meta(draft_path: Path, draft_name: str, materials: dict[str, VideoMaterial], duration: int) -> None:
@@ -202,6 +259,7 @@ def convert(
     replace: bool,
     canvas_width: int | None = None,
     canvas_height: int | None = None,
+    subtitles_path: Path | None = None,
 ) -> dict:
     started = time.perf_counter()
     root = ET.parse(input_xml).getroot()
@@ -234,22 +292,33 @@ def convert(
     )
     draft_path = draft_root / draft_name
 
-    audio_signatures = {
-        clip_signature(clip, files)
-        for track in audio_tracks
-        for clip in track.findall("clipitem")
-        if node_text(clip.find("enabled"), "TRUE").upper() != "FALSE"
-    }
-    video_signatures = {
-        clip_signature(clip, files)
-        for track in video_tracks
-        for clip in track.findall("clipitem")
-        if node_text(clip.find("enabled"), "TRUE").upper() != "FALSE"
-    }
-    embedded_audio_signatures = audio_signatures & video_signatures
+    warnings: list[str] = []
+    skipped_adjustment_clips = 0
+    video_paths: set[str] = set()
+    for track in video_tracks:
+        for clip in track.findall("clipitem"):
+            if is_adjustment_clip(clip):
+                continue
+            try:
+                video_paths.add(clip_path(clip, files))
+            except Exception as exc:
+                warnings.append(f"video {clip.get('id')} skipped: {exc}")
     material_cache = {
         os.path.normcase(os.path.abspath(path)): create_video_material(path)
-        for path in sorted(set(files.values()))
+        for path in sorted(video_paths)
+    }
+    audio_material_cache: dict[str, AudioMaterial] = {}
+    manifest = {}
+    if subtitles_path and subtitles_path.is_file():
+        manifest = json.loads(subtitles_path.read_text(encoding="utf-8-sig"))
+    clip_manifest = {
+        (
+            str(item.get("type", "")),
+            int(item.get("track_index", 0)),
+            int(item.get("start_frame", 0)),
+            int(item.get("end_frame", 0)),
+        ): item
+        for item in manifest.get("clips", [])
     }
     # Jianying always treats the first video track as the magnetic main track.
     # Keep that track empty so Resolve V1 is not pulled to time zero or rippled.
@@ -261,52 +330,96 @@ def convert(
 
     video_count = 0
     audio_count = 0
-    embedded_audio_count = 0
-    warnings: list[str] = []
-
+    disabled_video_count = 0
+    disabled_audio_count = 0
+    retimed_clip_count = 0
     for track_index, track in enumerate(video_tracks):
         for clip in track.findall("clipitem"):
-            if node_text(clip.find("enabled"), "TRUE").upper() == "FALSE":
+            if is_adjustment_clip(clip):
+                skipped_adjustment_clips += 1
                 continue
             try:
                 target, source = clip_timeranges(clip, fps)
-                has_embedded_audio = clip_signature(clip, files) in embedded_audio_signatures
+                enabled = node_text(clip.find("enabled"), "TRUE").upper() != "FALSE"
+                clip_start = int(node_text(clip.find("start"), "0"))
+                clip_end = int(node_text(clip.find("end"), "0"))
+                manifest_item = clip_manifest.get(("video", track_index + 1, clip_start, clip_end))
+                has_linked_audio = bool(manifest_item and manifest_item.get("linked_audio"))
                 source_path = clip_path(clip, files)
                 material = material_cache[os.path.normcase(os.path.abspath(source_path))]
+                source = manifest_source_timerange(manifest_item, source)
+                if source.end > material.duration:
+                    source = Timerange(source.start, max(1, material.duration - source.start))
                 segment = draft.VideoSegment(
                     material,
                     target,
                     source_timerange=source,
-                    volume=1.0 if has_embedded_audio or not audio_tracks else 0.0,
+                    volume=0.0 if has_linked_audio else 1.0,
                     clip_settings=clip_settings(clip),
                 )
+                segment.visible = enabled
                 script.add_segment(segment, track_name=f"V{track_index + 1}")
                 video_count += 1
-                if has_embedded_audio:
-                    embedded_audio_count += 1
+                if abs(segment.speed.speed - 1.0) > 0.001:
+                    retimed_clip_count += 1
+                if not enabled:
+                    disabled_video_count += 1
             except Exception as exc:
                 warnings.append(f"video {clip.get('id')}: {exc}")
 
     for track_index, track in enumerate(audio_tracks):
         for clip in track.findall("clipitem"):
-            if node_text(clip.find("enabled"), "TRUE").upper() == "FALSE":
-                continue
             try:
-                if clip_signature(clip, files) in embedded_audio_signatures:
-                    # The matching video segment carries this audio without an
-                    # additional extraction/transcode or duplicate media file.
-                    audio_count += 1
-                    continue
+                enabled = node_text(clip.find("enabled"), "TRUE").upper() != "FALSE"
                 target, source = clip_timeranges(clip, fps)
+                clip_start = int(node_text(clip.find("start"), "0"))
+                clip_end = int(node_text(clip.find("end"), "0"))
+                manifest_item = clip_manifest.get(("audio", track_index + 1, clip_start, clip_end))
+                source_path = clip_path(clip, files)
+                cache_key = os.path.normcase(os.path.abspath(source_path))
+                if cache_key not in audio_material_cache:
+                    audio_material_cache[cache_key] = create_audio_material(source_path)
+                audio_material = audio_material_cache[cache_key]
+                source = manifest_source_timerange(manifest_item, source)
+                if source.end > audio_material.duration:
+                    source = Timerange(source.start, max(1, audio_material.duration - source.start))
                 segment = draft.AudioSegment(
-                    clip_path(clip, files),
+                    audio_material,
                     target,
                     source_timerange=source,
                 )
+                segment.visible = enabled
                 script.add_segment(segment, track_name=f"A{track_index + 1}")
                 audio_count += 1
+                if abs(segment.speed.speed - 1.0) > 0.001:
+                    retimed_clip_count += 1
+                if not enabled:
+                    disabled_audio_count += 1
             except Exception as exc:
                 warnings.append(f"audio {clip.get('id')}: {exc}")
+
+    subtitle_count = 0
+    subtitle_tracks = 0
+    if subtitles_path and subtitles_path.is_file():
+        subtitle_data = manifest
+        for track_index, items in enumerate(subtitle_data.get("tracks", []), 1):
+            if not items:
+                continue
+            track_name = f"Subtitle {track_index}"
+            script.add_track(draft.TrackType.text, track_name, relative_index=track_index - 1)
+            subtitle_tracks += 1
+            for item in items:
+                text = str(item.get("text") or "").strip()
+                start_frame = int(round(float(item.get("start_frame", 0))))
+                end_frame = int(round(float(item.get("end_frame", start_frame))))
+                if not text or end_frame <= start_frame:
+                    continue
+                timerange = Timerange(
+                    frames_to_us(start_frame, fps),
+                    frames_to_us(end_frame - start_frame, fps),
+                )
+                script.add_segment(draft.TextSegment(text, timerange), track_name=track_name)
+                subtitle_count += 1
 
     script.save()
     update_draft_meta(draft_path, draft_name, material_cache, script.duration)
@@ -320,7 +433,13 @@ def convert(
         "audio_tracks": len(audio_tracks),
         "video_clips": video_count,
         "audio_clips": audio_count,
-        "embedded_audio_clips": embedded_audio_count,
+        "subtitle_tracks": subtitle_tracks,
+        "subtitle_clips": subtitle_count,
+        "skipped_adjustment_clips": skipped_adjustment_clips,
+        "disabled_video_clips": disabled_video_count,
+        "disabled_audio_clips": disabled_audio_count,
+        "retimed_clips": retimed_clip_count,
+        "embedded_audio_clips": 0,
         "warnings": warnings,
         "elapsed_seconds": round(time.perf_counter() - started, 3),
     }
@@ -334,6 +453,7 @@ def main() -> int:
     parser.add_argument("--replace", action="store_true")
     parser.add_argument("--width", type=int)
     parser.add_argument("--height", type=int)
+    parser.add_argument("--subtitles", type=Path)
     args = parser.parse_args()
     name = args.name or f"{args.input_xml.stem}-达芬奇导入-{time.strftime('%m%d-%H%M%S')}"
     try:
@@ -344,6 +464,7 @@ def main() -> int:
             args.replace,
             canvas_width=args.width,
             canvas_height=args.height,
+            subtitles_path=args.subtitles,
         )
     except Exception as exc:
         print(f"ERROR: {exc}", file=sys.stderr)

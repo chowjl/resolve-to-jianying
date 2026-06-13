@@ -131,7 +131,7 @@ try {
         jianying_install_dir = $JianyingInstallDir
         draft_root = $DraftRoot
         installed_at = (Get-Date).ToString("s")
-        version = "1.1.0"
+        version = "1.2.0"
     }
     $ConfigJson = $Config | ConvertTo-Json
     $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)

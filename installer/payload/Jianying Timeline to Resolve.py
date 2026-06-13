@@ -39,6 +39,40 @@ def safe_name(value):
     return value[:80] or "Jianying Timeline"
 
 
+def srt_time(frame, fps):
+    milliseconds = int(round(frame * 1000.0 / fps))
+    hours, remainder = divmod(milliseconds, 3600000)
+    minutes, remainder = divmod(remainder, 60000)
+    seconds, milliseconds = divmod(remainder, 1000)
+    return "%02d:%02d:%02d,%03d" % (hours, minutes, seconds, milliseconds)
+
+
+def write_srt(path, subtitles, fps):
+    lines = []
+    for index, item in enumerate(subtitles, 1):
+        lines.extend([
+            str(index),
+            "%s --> %s" % (srt_time(item["start_frame"], fps), srt_time(item["end_frame"], fps)),
+            item["text"],
+            "",
+        ])
+    Path(path).write_text("\n".join(lines), encoding="utf-8-sig")
+
+
+def unique_timeline_name(project, requested):
+    existing = set()
+    for index in range(1, int(project.GetTimelineCount() or 0) + 1):
+        timeline = project.GetTimelineByIndex(index)
+        if timeline:
+            existing.add(timeline.GetName())
+    if requested not in existing:
+        return requested
+    number = 2
+    while "%s (%d)" % (requested, number) in existing:
+        number += 1
+    return "%s (%d)" % (requested, number)
+
+
 def load_config():
     if not os.path.isfile(CONFIG_FILE):
         raise RuntimeError("工具配置不存在，请重新运行安装程序。")
@@ -111,23 +145,26 @@ def ask_options(config, draft_path):
     window = dispatcher.AddWindow(
         {
             "ID": window_id,
-            "Geometry": [500, 260, 700, 250],
+            "Geometry": [460, 190, 760, 360],
             "WindowTitle": "剪映 → DaVinci Resolve",
         },
-        ui.VGroup({"Spacing": 10, "Margin": 18}, [
+        ui.VGroup({"Spacing": 8, "Margin": 18}, [
             ui.Label({"Text": "剪映草稿文件夹：", "Weight": 0}),
             ui.HGroup({"Weight": 0}, [
                 ui.LineEdit({"ID": "DraftPath", "Text": draft_path, "Weight": 1}),
-                ui.Button({"ID": "Browse", "Text": "浏览...", "Weight": 0}),
+                ui.Button({"ID": "Browse", "Text": "浏览...", "Weight": 0, "MinimumSize": [110, 32]}),
+                ui.HGap(12, 0),
             ]),
             ui.Label({"Text": "已自动定位到剪映草稿目录，可点击浏览重新选择。", "Weight": 0}),
             ui.Label({"Text": "导入后的达芬奇时间线名称：", "Weight": 0}),
             ui.LineEdit({"ID": "TimelineName", "Text": safe_name(draft_name), "Weight": 0}),
             ui.Label({"ID": "Status", "Text": "准备导入", "Weight": 0}),
+            ui.VGap(4),
             ui.HGroup({"Weight": 0}, [
                 ui.HGap(0, 1),
-                ui.Button({"ID": "Cancel", "Text": "取消"}),
-                ui.Button({"ID": "Start", "Text": "导入时间线"}),
+                ui.Button({"ID": "Cancel", "Text": "取消", "MinimumSize": [130, 34]}),
+                ui.Button({"ID": "Start", "Text": "导入时间线", "MinimumSize": [150, 34]}),
+                ui.HGap(0, 1),
             ]),
         ]),
     )
@@ -174,42 +211,118 @@ def main():
     if not os.path.isdir(draft_path):
         raise RuntimeError("剪映草稿文件夹不存在：%s" % draft_path)
 
-    temp_dir = Path(tempfile.gettempdir()) / "XiaoerJianyingToResolve"
-    temp_dir.mkdir(parents=True, exist_ok=True)
-    xml_path = temp_dir / (safe_name(timeline_name) + ".xml")
     log("convert start: %s" % draft_path)
-    report = run_converter(
+    plan = run_converter(
         config,
         [
             "--draft", draft_path,
-            "--output", str(xml_path),
             "--name", timeline_name,
             "--decryptor", DECRYPTOR,
+            "--plan",
         ],
     )
 
     media_pool = project.GetMediaPool()
-    timeline = media_pool.ImportTimelineFromFile(
-        str(xml_path),
-        {"timelineName": timeline_name, "importSourceClips": True},
-    )
+    requested_name = timeline_name
+    timeline_name = unique_timeline_name(project, requested_name)
+    if timeline_name != requested_name:
+        log("timeline renamed to avoid duplicate: %s" % timeline_name)
+    project.SetSetting("timelineFrameRate", str(plan["fps"]))
+    project.SetSetting("timelineResolutionWidth", str(plan["width"]))
+    project.SetSetting("timelineResolutionHeight", str(plan["height"]))
+    timeline = media_pool.CreateEmptyTimeline(timeline_name)
     if not timeline:
-        raise RuntimeError("DaVinci Resolve 未能导入生成的 XML 时间线。")
+        raise RuntimeError("DaVinci Resolve 未能创建新时间线：%s" % timeline_name)
     project.SetCurrentTimeline(timeline)
+    timeline.SetStartTimecode("00:00:00:00")
+    timeline.SetSetting("timelineFrameRate", str(plan["fps"]))
+    timeline.SetSetting("timelineResolutionWidth", str(plan["width"]))
+    timeline.SetSetting("timelineResolutionHeight", str(plan["height"]))
+    timeline_start = timeline.GetStartFrame()
+
+    imported = {}
+    def media_item(path):
+        key = os.path.normcase(os.path.abspath(path))
+        if key not in imported:
+            items = resolved.GetMediaStorage().AddItemListToMediaPool([path]) or []
+            if not items:
+                raise RuntimeError("无法导入素材：%s" % path)
+            imported[key] = items[0]
+        return imported[key]
+
+    counts = {"video": 0, "audio": 0}
+    track_indexes = {"video": 0, "audio": 0}
+    for source_track in plan["tracks"]:
+        track_type = source_track["type"]
+        track_indexes[track_type] += 1
+        track_index = track_indexes[track_type]
+        while timeline.GetTrackCount(track_type) < track_index:
+            if not timeline.AddTrack(track_type):
+                raise RuntimeError("无法创建%s轨道 %d。" % ("视频" if track_type == "video" else "音频", track_index))
+        for segment in source_track["segments"]:
+            item = media_item(segment["path"])
+            clip_info = {
+                "mediaPoolItem": item,
+                "startFrame": segment["start_frame"],
+                "endFrame": segment["end_frame"],
+                "mediaType": 1 if track_type == "video" else 2,
+                "trackIndex": track_index,
+                "recordFrame": timeline_start + segment["record_frame"],
+            }
+            if not media_pool.AppendToTimeline([clip_info]):
+                raise RuntimeError("无法放置素材：%s" % segment["path"])
+            counts[track_type] += 1
+
+        if track_type == "video":
+            audible = [segment for segment in source_track["segments"] if segment.get("volume", 1) > 0]
+            if audible:
+                track_indexes["audio"] += 1
+                audio_index = track_indexes["audio"]
+                while timeline.GetTrackCount("audio") < audio_index:
+                    if not timeline.AddTrack("audio"):
+                        raise RuntimeError("无法创建音频轨道 %d。" % audio_index)
+                for segment in audible:
+                    clip_info = {
+                        "mediaPoolItem": media_item(segment["path"]),
+                        "startFrame": segment["start_frame"],
+                        "endFrame": segment["end_frame"],
+                        "mediaType": 2,
+                        "trackIndex": audio_index,
+                        "recordFrame": timeline_start + segment["record_frame"],
+                    }
+                    if not media_pool.AppendToTimeline([clip_info]):
+                        raise RuntimeError("无法放置素材音频：%s" % segment["path"])
+                    counts["audio"] += 1
+
+    subtitle_count = len(plan.get("subtitles") or [])
+    subtitle_added = 0
+    subtitle_note = ""
+    if subtitle_count:
+        subtitle_dir = Path(tempfile.gettempdir()) / "XiaoerJianyingToResolve"
+        subtitle_dir.mkdir(parents=True, exist_ok=True)
+        subtitle_path = subtitle_dir / (safe_name(timeline_name) + ".srt")
+        write_srt(subtitle_path, plan["subtitles"], float(plan["fps"]))
+        timeline.SetCurrentTimecode("00:00:00:00")
+        log("subtitle SRT generated: %s" % subtitle_path)
+        subtitle_note = "\n\n字幕已导出为 SRT，请在 Resolve 中使用 File > Import > Subtitle 导入：\n%s" % subtitle_path
+
     resolved.GetProjectManager().SaveProject()
-    log("import done: " + json.dumps(report, ensure_ascii=False))
+    log("import done: " + json.dumps(plan, ensure_ascii=False))
 
     warning = ""
-    if report.get("missing_media"):
-        warning = "\n\n有 %d 个素材路径不存在，需在达芬奇中重新链接。" % len(report["missing_media"])
+    if plan.get("missing_media"):
+        warning = "\n\n有 %d 个素材路径不存在，需在达芬奇中重新链接。" % len(plan["missing_media"])
     message(
         "剪映 → DaVinci Resolve",
-        "导入完成。\n\n时间线：%s\n视频片段：%s\n音频片段：%s\n画布：%sx%s  %s fps%s"
+        "导入完成。\n\n时间线：%s\n视频片段：%s\n音频片段：%s\n字幕：%s/%s\n画布：%sx%s  %s fps%s%s"
         % (
             timeline_name,
-            report.get("video_clips", 0),
-            report.get("audio_clips", 0),
-            report.get("width"), report.get("height"), report.get("fps"), warning,
+            counts["video"],
+            counts["audio"],
+            subtitle_added,
+            subtitle_count,
+            plan.get("width"), plan.get("height"), plan.get("fps"), warning,
+            subtitle_note,
         ),
     )
 

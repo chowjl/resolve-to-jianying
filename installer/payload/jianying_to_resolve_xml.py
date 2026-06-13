@@ -154,6 +154,22 @@ def _material_maps(content: dict) -> tuple[dict, dict]:
     return videos, audios
 
 
+def _subtitle_text(material: dict) -> str:
+    text = material.get("recognize_text") or ""
+    if not text:
+        for key in ("content", "base_content"):
+            value = material.get(key)
+            if not value:
+                continue
+            try:
+                text = json.loads(value).get("text") or ""
+            except (TypeError, json.JSONDecodeError):
+                pass
+            if text:
+                break
+    return str(text).replace("\\N", "\n").strip()
+
+
 def _file_node(
     clipitem: ET.Element,
     material: dict,
@@ -340,6 +356,87 @@ def build_xml(
     }
 
 
+def build_plan(
+    draft_dir: Path,
+    timeline_name: str | None = None,
+    decryptor: Path | None = None,
+) -> dict:
+    timeline_path, content = load_draft(draft_dir, decryptor)
+    fps = float(content.get("fps") or 30)
+    canvas = content.get("canvas_config") or {}
+    videos, audios = _material_maps(content)
+    text_materials = {
+        item["id"]: item
+        for item in ((content.get("materials") or {}).get("texts") or [])
+        if item.get("id")
+    }
+    tracks = []
+    subtitles = []
+    missing = set()
+
+    for track in content.get("tracks") or []:
+        track_type = track.get("type")
+        segments = track.get("segments") or []
+        if not segments:
+            continue
+        if track_type == "text":
+            for segment in segments:
+                material = text_materials.get(segment.get("material_id"))
+                if not material:
+                    continue
+                text = _subtitle_text(material)
+                if not text:
+                    continue
+                target = segment.get("target_timerange") or {}
+                start = _frames(target.get("start", 0), fps)
+                duration = max(1, _frames(target.get("duration", 0), fps))
+                subtitles.append({"start_frame": start, "end_frame": start + duration, "text": text})
+            continue
+        if track_type not in ("video", "audio"):
+            continue
+        material_map = videos if track_type == "video" else audios
+        planned = []
+        for segment in segments:
+            material = material_map.get(segment.get("material_id"))
+            if not material:
+                continue
+            path = material["path"]
+            if not Path(path).is_file():
+                missing.add(path)
+            target = segment.get("target_timerange") or {}
+            source = segment.get("source_timerange") or {}
+            record_frame = _frames(target.get("start", 0), fps)
+            duration = max(1, _frames(target.get("duration", 0), fps))
+            source_start = _frames(source.get("start", 0), fps)
+            source_duration = _frames(source.get("duration", 0), fps)
+            if source_duration <= 0:
+                source_duration = max(1, int(round(duration * float(segment.get("speed") or 1))))
+            planned.append(
+                {
+                    "path": path,
+                    "record_frame": record_frame,
+                    "start_frame": source_start,
+                    "end_frame": source_start + source_duration - 1,
+                    "volume": float(segment.get("volume", 1) or 0),
+                }
+            )
+        if planned:
+            tracks.append({"type": track_type, "name": track.get("name") or "", "segments": planned})
+
+    return {
+        "draft": draft_dir.name,
+        "timeline_file": str(timeline_path),
+        "timeline_name": timeline_name or draft_dir.name,
+        "fps": fps,
+        "width": int(canvas.get("width") or 1920),
+        "height": int(canvas.get("height") or 1080),
+        "duration_frames": max(1, _frames(content.get("duration", 0), fps)),
+        "tracks": tracks,
+        "subtitles": sorted(subtitles, key=lambda item: item["start_frame"]),
+        "missing_media": sorted(missing),
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Convert Jianying draft to Resolve FCP 7 XML.")
     parser.add_argument("--draft-root", type=Path)
@@ -348,6 +445,7 @@ def main() -> int:
     parser.add_argument("--output", type=Path)
     parser.add_argument("--name")
     parser.add_argument("--decryptor", type=Path)
+    parser.add_argument("--plan", action="store_true")
     args = parser.parse_args()
     try:
         if args.list:
@@ -355,9 +453,14 @@ def main() -> int:
                 raise ValueError("--draft-root is required with --list")
             result = scan_drafts(args.draft_root, args.decryptor)
         else:
-            if not args.draft or not args.output:
-                raise ValueError("--draft and --output are required")
-            result = build_xml(args.draft, args.output, args.name, args.decryptor)
+            if not args.draft:
+                raise ValueError("--draft is required")
+            if args.plan:
+                result = build_plan(args.draft, args.name, args.decryptor)
+            else:
+                if not args.output:
+                    raise ValueError("--output is required")
+                result = build_xml(args.draft, args.output, args.name, args.decryptor)
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0
     except (OSError, ValueError) as exc:

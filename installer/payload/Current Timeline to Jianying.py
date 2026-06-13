@@ -39,6 +39,14 @@ def safe_name(value):
     return value[:80] or "Resolve Timeline"
 
 
+def source_time(item, method_name):
+    value = getattr(item, method_name)()
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def load_config():
     if not os.path.isfile(CONFIG_FILE):
         raise RuntimeError("工具配置不存在，请重新运行安装程序。")
@@ -146,9 +154,68 @@ def main():
     temp_dir = Path(tempfile.gettempdir()) / "XiaoerResolveToJianying"
     temp_dir.mkdir(parents=True, exist_ok=True)
     xml_path = temp_dir / (draft_name + ".xml")
+    subtitle_path = temp_dir / (draft_name + "-subtitles.json")
     log("export start: %s" % timeline.GetName())
     if not timeline.Export(str(xml_path), resolved.EXPORT_FCP_7_XML):
         raise RuntimeError("达芬奇导出 FCP 7 XML 失败。")
+
+    timeline_start = int(timeline.GetStartFrame() or 0)
+    clip_manifest = []
+    for track_index in range(1, int(timeline.GetTrackCount("video") or 0) + 1):
+        for item in timeline.GetItemListInTrack("video", track_index) or []:
+            linked_audio = False
+            for linked_item in item.GetLinkedItems() or []:
+                track_info = linked_item.GetTrackTypeAndIndex() or []
+                if track_info and track_info[0] == "audio":
+                    linked_audio = True
+                    break
+            clip_manifest.append({
+                "type": "video",
+                "track_index": track_index,
+                "start_frame": int(round(float(item.GetStart(True)) - timeline_start)),
+                "end_frame": int(round(float(item.GetEnd(True)) - timeline_start)),
+                "linked_audio": linked_audio,
+                "source_start_time": source_time(item, "GetSourceStartTime"),
+                "source_end_time": source_time(item, "GetSourceEndTime"),
+            })
+    for track_index in range(1, int(timeline.GetTrackCount("audio") or 0) + 1):
+        for item in timeline.GetItemListInTrack("audio", track_index) or []:
+            clip_manifest.append({
+                "type": "audio",
+                "track_index": track_index,
+                "start_frame": int(round(float(item.GetStart(True)) - timeline_start)),
+                "end_frame": int(round(float(item.GetEnd(True)) - timeline_start)),
+                "source_start_time": source_time(item, "GetSourceStartTime"),
+                "source_end_time": source_time(item, "GetSourceEndTime"),
+            })
+    subtitle_tracks = []
+    for track_index in range(1, int(timeline.GetTrackCount("subtitle") or 0) + 1):
+        items = []
+        for item in timeline.GetItemListInTrack("subtitle", track_index) or []:
+            text = item.GetName() or ""
+            start_frame = float(item.GetStart(True)) - timeline_start
+            end_frame = float(item.GetEnd(True)) - timeline_start
+            if text.strip() and end_frame > start_frame:
+                items.append({
+                    "text": text,
+                    "start_frame": start_frame,
+                    "end_frame": end_frame,
+                })
+        subtitle_tracks.append(items)
+    subtitle_path.write_text(
+        json.dumps({
+            "tracks": subtitle_tracks,
+            "clips": clip_manifest,
+        }, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    log("subtitle export: %d tracks, %d items" % (
+        len(subtitle_tracks), sum(len(items) for items in subtitle_tracks)
+    ))
+    log("video audio links: %d video items, %d linked to audio" % (
+        sum(1 for item in clip_manifest if item["type"] == "video"),
+        sum(1 for item in clip_manifest if item.get("linked_audio")),
+    ))
 
     command = [
         config["python_exe"], WORKER,
@@ -158,6 +225,7 @@ def main():
         "--name", draft_name,
         "--jianying", config["jianying_exe"],
         "--log", LOG_FILE,
+        "--subtitles", str(subtitle_path),
     ]
     if width > 0 and height > 0:
         command.extend(["--width", str(width), "--height", str(height)])

@@ -49,6 +49,10 @@ Transfer editable timelines between DaVinci Resolve and Jianying Pro for Windows
 ----------------------------
 - 视频和音频轨道 / Video and audio tracks
 - 时间位置、剪辑点、素材入点与出点 / Timeline edits and source ranges
+- 分离音频与 WAV/MP3 纯音频 / Detached audio and standalone WAV/MP3 audio
+- 整段固定变速 / Constant-speed retiming
+- Resolve 字幕转剪映字幕 / Resolve subtitles to Jianying subtitles
+- 禁用片段保持真正停用 / Disabled clips remain disabled
 - 基础缩放、位置、旋转与透明度 / Basic transforms and opacity
 - 横屏、竖屏时间线 / Landscape and portrait timelines
 - 素材库同步与去重 / Media library population and deduplication
@@ -56,11 +60,16 @@ Transfer editable timelines between DaVinci Resolve and Jianying Pro for Windows
 
 限制 / Limitations
 ------------------
-Resolve 调色节点、Fusion、第三方插件、复杂转场、光流变速及 Fairlight 特效
-无法保证完整迁移。
+Resolve Adjustment Clip 会自动跳过并提示。速度曲线、倒放、光流变速、
+Resolve 调色节点、Fusion、第三方插件、复杂转场及 Fairlight 特效无法保证完整迁移。
 
-Resolve color nodes, Fusion compositions, third-party plugins, complex transitions,
-optical-flow retiming, and Fairlight effects are not guaranteed to transfer.
+Resolve Adjustment Clips are skipped with a notice. Speed curves, reverse playback,
+optical-flow retiming, color nodes, Fusion compositions, third-party plugins,
+complex transitions, and Fairlight effects are not guaranteed to transfer.
+
+剪映转 Resolve 时，字幕会生成 SRT；请使用 File > Import > Subtitle 导入。
+For Jianying to Resolve, subtitles are exported as SRT; import them with
+File > Import > Subtitle.
 
 卸载 / Uninstallation
 ---------------------

@@ -1,84 +1,40 @@
-达芬奇与剪映时间线互转 / DaVinci Resolve and Jianying Timeline Bridge
-============================================================
+达芬奇时间线导入剪映 / DaVinci Resolve to Jianying
+====================================================
 
-简介 / Overview
----------------
-在 DaVinci Resolve 与 Windows 剪映专业版之间双向迁移可编辑时间线。
-Transfer editable timelines between DaVinci Resolve and Jianying Pro for Windows.
-
-系统要求 / Requirements
------------------------
-1. Windows 10/11
-2. DaVinci Resolve 20 或 21 / DaVinci Resolve 20 or 21
-3. Windows 剪映专业版 / Jianying Pro for Windows
-4. Python 3.8+，推荐 3.11/3.12 / Python 3.8+, preferably 3.11/3.12
-5. 首次安装依赖时需要联网 / Internet access is required during first installation
+将 DaVinci Resolve 当前时间线转换为 Windows 剪映专业版可编辑草稿。
+Convert the current Resolve timeline into an editable Jianying Pro draft.
 
 安装 / Installation
 -------------------
-1. 解压整个 ZIP，不要只运行压缩包内的单个文件。
-   Extract the entire ZIP before running the installer.
-2. 双击“安装.cmd”或“Install.cmd”。
-   Double-click Install.cmd or 安装.cmd.
-3. 安装完成后，完全退出并重新启动 DaVinci Resolve。
-   Fully restart DaVinci Resolve after installation.
+1. 解压整个 ZIP。 / Extract the complete ZIP.
+2. 双击“安装.cmd”或“Install.cmd”。 / Run 安装.cmd or Install.cmd.
+3. 完全退出并重启 Resolve。 / Fully restart Resolve.
 
 使用 / Usage
 ------------
-达芬奇转剪映 / Resolve to Jianying:
-1. 在 DaVinci Resolve 中打开目标项目和时间线。
-   Open the target project and timeline in DaVinci Resolve.
-2. 选择：Workspace > Scripts > Utility > Current Timeline to Jianying
-3. 输入剪映草稿名称并点击“开始转换”。
-   Enter the Jianying draft name and click Start Conversion.
-4. 等待进度窗口完成；转换期间可以继续使用 Resolve。
-   Wait for the progress window; Resolve remains usable.
-5. 转换完成后剪映会自动启动。
-   Jianying starts automatically when conversion finishes.
+1. 在 Resolve 中打开目标时间线。 / Open the target Resolve timeline.
+2. 运行：Workspace > Scripts > Utility > Current Timeline to Jianying
+3. 输入剪映草稿名称并开始转换。 / Name the draft and start conversion.
 
-剪映转达芬奇 / Jianying to Resolve:
-1. 在 DaVinci Resolve 中打开接收项目。
-   Open the destination project in DaVinci Resolve.
-2. 选择：Workspace > Scripts > Utility > Jianying Timeline to Resolve
-3. 文件夹选择器会自动定位到剪映草稿目录；选择目标草稿文件夹。
-   The folder picker opens at Jianying's draft root; select the target draft folder.
-4. 确认时间线名称并点击“导入时间线”。
-   Confirm the timeline name and click Import Timeline.
-
-支持内容 / Supported Content
-----------------------------
-- 视频和音频轨道 / Video and audio tracks
-- 时间位置、剪辑点、素材入点与出点 / Timeline edits and source ranges
-- 分离音频与 WAV/MP3 纯音频 / Detached audio and standalone WAV/MP3 audio
+支持 / Supported
+----------------
+- 视频、分离音频、WAV/MP3 纯音频 / Video, detached audio, WAV/MP3
+- 剪辑位置与源范围 / Timeline positions and source ranges
 - 整段固定变速 / Constant-speed retiming
 - Resolve 字幕转剪映字幕 / Resolve subtitles to Jianying subtitles
-- 禁用片段保持真正停用 / Disabled clips remain disabled
-- 基础缩放、位置、旋转与透明度 / Basic transforms and opacity
-- 横屏、竖屏时间线 / Landscape and portrait timelines
-- 素材库同步与去重 / Media library population and deduplication
-- 空剪映主轨防止第一轨磁吸错位 / Empty main track to prevent magnetic offsets
+- 灰色禁用片段保持真正停用 / Disabled clips remain disabled
+- 横屏、竖屏及基础变换 / Landscape, portrait, and basic transforms
 
 限制 / Limitations
 ------------------
-Resolve Adjustment Clip 会自动跳过并提示。速度曲线、倒放、光流变速、
-Resolve 调色节点、Fusion、第三方插件、复杂转场及 Fairlight 特效无法保证完整迁移。
+Adjustment Clip 会自动跳过并提示。速度曲线、倒放、光流变速、调色节点、
+Fusion、第三方插件、复杂转场及 Fairlight 特效无法保证完整迁移。
 
-Resolve Adjustment Clips are skipped with a notice. Speed curves, reverse playback,
-optical-flow retiming, color nodes, Fusion compositions, third-party plugins,
-complex transitions, and Fairlight effects are not guaranteed to transfer.
-
-剪映转 Resolve 时，字幕会生成 SRT；请使用 File > Import > Subtitle 导入。
-For Jianying to Resolve, subtitles are exported as SRT; import them with
-File > Import > Subtitle.
+Adjustment Clips are skipped with a notice. Speed curves, reverse playback,
+optical-flow retiming, color nodes, Fusion, third-party plugins, complex
+transitions, and Fairlight effects are not guaranteed to transfer.
 
 卸载 / Uninstallation
 ---------------------
-双击“卸载.cmd”或“Uninstall.cmd”。卸载不会删除已生成的剪映草稿。
-Double-click Uninstall.cmd or 卸载.cmd. Existing Jianying drafts are preserved.
-
-开源依赖 / Open-source Dependency
----------------------------------
-pyJianYingDraft 0.2.6
-https://github.com/GuanYixuan/pyJianYingDraft
-许可证位于 THIRD_PARTY_LICENSES 文件夹。
-Its license is included in THIRD_PARTY_LICENSES.
+运行“卸载.cmd”或“Uninstall.cmd”。已有剪映草稿不会被删除。
+Run 卸载.cmd or Uninstall.cmd. Existing Jianying drafts are preserved.

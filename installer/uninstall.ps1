@@ -4,8 +4,7 @@ try {
     $ResolveSupport = Join-Path $env:APPDATA "Blackmagic Design\DaVinci Resolve\Support"
     $ToolRoot = Join-Path $ResolveSupport "XiaoerTools"
     $MenuScripts = @(
-        (Join-Path $ResolveSupport "Fusion\Scripts\Utility\Current Timeline to Jianying.py"),
-        (Join-Path $ResolveSupport "Fusion\Scripts\Utility\Jianying Timeline to Resolve.py")
+        (Join-Path $ResolveSupport "Fusion\Scripts\Utility\Current Timeline to Jianying.py")
     )
 
     foreach ($MenuScript in $MenuScripts) {
